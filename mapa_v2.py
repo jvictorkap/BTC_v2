@@ -210,7 +210,40 @@ def main():
     repac['volume repac'] = repac['preco d-1']*repac['taxa d-1']*repac['dbl_quantidade']
     repac['volume atual'] = repac['volume']*repac['preco']
 
-    repac.to_excel('repac.xlsx')
+    repac['vencimento'] = repac['vencimento'].apply(lambda x: datetime.datetime.strptime(str(x),'%Y%m%d').date())
+    internas_repac = repac[['str_numcontrato','tipo']].drop_duplicates().dropna()
+
+    contratos_internos = list()
+    for x in internas_repac['str_numcontrato'].unique():
+        if internas_repac['str_numcontrato'].tolist().count(x)>1:
+            contratos_internos.append(x)
+
+    repac = repac[~repac['str_numcontrato'].isin(contratos_internos)]
+
+    repac = repac[repac['vencimento']>dt]
+
+    repac = repac[['dte_data','str_fundo', 'str_mesa', 'str_estrategia', 'str_numcontrato','vencimento',
+        'dbl_quantidade', 'codigo', 'tipo', 'corretora','preco','preco d-1', 'taxa d-1', 'taxa média', 'volume repac', 'volume atual']]
+
+    tomador_repac = repac[repac['tipo']=='T']
+    doador_repac = repac[repac['tipo']=='D']
+
+    tomador_repac = tomador_repac[tomador_repac['volume repac']<tomador_repac['volume atual']]
+    tomador_repac['dif'] = (tomador_repac['volume repac']/tomador_repac['volume atual'])*100
+    tomador_repac_new = tomador_repac[tomador_repac['dif']<70]
+    contratos_devol = tomador_repac_new['str_numcontrato'].unique()
+
+    tomador_repac_new = tomador_repac_new.groupby(['str_fundo','codigo']).agg({'dbl_quantidade':sum}).reset_index()
+
+
+    doador_repac['dif'] = (doador_repac['volume repac']/doador_repac['volume atual'])*100
+    doador_repac_new = doador_repac[doador_repac['dif']>200]
+
+    tomador_repac_new.to_excel("rG:\Trading\K11\Aluguel\Arquivos\Repactuação\\tomador_"+dt.strftime('%Y%m%d')+'.xlsx')
+    doador_repac_new.to_excel("rG:\Trading\K11\Aluguel\Arquivos\Repactuação\\doador_"+dt.strftime('%Y%m%d')+'.xlsx')
+
+
+
 
 
     ## vencimentos   
