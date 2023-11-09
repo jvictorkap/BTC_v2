@@ -1,0 +1,6 @@
+{
+    "python.pythonPath": "C:\\Python37\\Scripts\\python.exe",
+    "python.analysis.extraPaths": [
+        "./dash"
+    ]
+}
