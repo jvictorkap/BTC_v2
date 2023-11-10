@@ -32,7 +32,7 @@ def parse_excel_necton(file_path):
     
     df["str_corretora"] = "Concordia"
     df["str_tipo_registro"] = df["modalidade"].apply(
-        lambda x: "R" if x == "BALCAO" else "N" if x == "D1" else None
+        lambda x: "R" if "B" in x.upper() else "N" if x == "D1" else None
     )
     df["str_modalidade"] = df["str_tipo_registro"].apply(
         lambda x: "E1" if x == "N" else None

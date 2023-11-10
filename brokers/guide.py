@@ -9,6 +9,11 @@ import numpy as np
 import pandas as pd
 
 
+side_bol={
+    'T':1,
+    'D':-1
+}
+
 def parse_excel_guide(file_path):
 
     df = pd.read_excel(file_path)
@@ -18,6 +23,7 @@ def parse_excel_guide(file_path):
             "corretora": "str_corretora",
             "vencimento": "dte_datavencimento",
             "ativo": "str_papel",
+            'lado':'str_tipo',
             "quantidade": "dbl_quantidade",
             "taxa": "dbl_taxa",
         },
@@ -39,8 +45,8 @@ def parse_excel_guide(file_path):
     df["str_reversivel"] = "TD"
     
     df["str_status"] = "Emprestimo"
-    df["str_tipo"] = "D"
-    df["dbl_quantidade"] = df["dbl_quantidade"].apply(lambda x: x * (-1))
+    df['str_tipo'] = df['str_tipo'].apply(lambda x: x[0])
+    df['dbl_quantidade']=df.apply(lambda row: 1*abs(row['dbl_quantidade'])*side_bol[row['str_tipo']],axis=1)
 
 
     df["dte_databoleta"] = date.today().strftime("%Y-%m-%d")

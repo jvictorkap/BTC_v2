@@ -37,28 +37,6 @@ dt_4 = workdays.workday(dt, -4, holidays_b3)
 
 holidays_br = workdays.load_holidays('BR')
 holidays_b3 = workdays.load_holidays('B3')
-dt = datetime.date.today()
-
-
-dt_1 = workdays.workday(dt, -1, holidays_b3)
-
-dt_1 = workdays.workday(dt, -1, holidays_b3)
-vcto_0 = dt
-dt_pos = workdays.workday(dt, -1, holidays_br)
-venc_interna = workdays.workday(dt, 1, holidays_br)
-
-dt_next_1 = workdays.workday(dt, 1, holidays_b3)
-vcto_1 = dt_next_1
-dt_next_2 = workdays.workday(dt, 2, holidays_b3)
-vcto_2 = dt_next_2
-dt_next_3 = workdays.workday(dt, 3, holidays_b3)
-vcto_3 = dt_next_3
-dt_next_4 = workdays.workday(dt, 4, holidays_b3)
-vcto_4 = dt_next_4
-dt_next_5 = workdays.workday(dt, 5, holidays_b3)
-vcto_5 = dt_next_5
-
-dt_liq = workdays.workday(dt_1, 4, holidays_b3)
 
 
 
@@ -67,7 +45,31 @@ def round_up(n, decimals=1):
     return math.ceil(n * multiplier) / multiplier
 
 
-def main():
+def main(dt=None):
+    if dt==None:
+        dt = datetime.date.today()
+
+    dt_1 = workdays.workday(dt, -1, holidays_b3)
+
+    dt_1 = workdays.workday(dt, -1, holidays_b3)
+    vcto_0 = dt
+    dt_pos = workdays.workday(dt, -1, holidays_br)
+    venc_interna = workdays.workday(dt, 1, holidays_br)
+
+    dt_next_1 = workdays.workday(dt, 1, holidays_b3)
+    vcto_1 = dt_next_1
+    dt_next_2 = workdays.workday(dt, 2, holidays_b3)
+    vcto_2 = dt_next_2
+    dt_next_3 = workdays.workday(dt, 3, holidays_b3)
+    vcto_3 = dt_next_3
+    dt_next_4 = workdays.workday(dt, 4, holidays_b3)
+    vcto_4 = dt_next_4
+    dt_next_5 = workdays.workday(dt, 5, holidays_b3)
+    vcto_5 = dt_next_5
+
+    dt_liq = workdays.workday(dt_1, 4, holidays_b3)
+
+
 
 
     db_conn_test = psycopg2.connect(
@@ -156,7 +158,7 @@ def main():
     ex_df['prop'] = ex_df['dbl_quantidade']/ex_df['full size']
 
     ex_df['new_qtd'] = round(ex_df['prop']*ex_df['saldo'])
-    ex_df.to_clipboard()
+    
     ex_df['dbl_quantidade'] = ex_df['new_qtd']
     
     
@@ -194,54 +196,58 @@ def main():
     
 
     ###----REPACTUAÇÕES--####
-    repac = ctos_btc
+    repac = ctos_btc.copy()
     
-    
-    repac.groupby(['str_fundo','codigo','tipo','taxa','preco','str_numcontrato','modalidade','vencimento','corretora']).agg({'volume':sum,'dbl_quantidade':sum}).reset_index()
-    taxas_med =DB.get_taxasalugueis(None)[['tckrsymb','takravrgrate']].rename(columns={'tckrsymb':'codigo','takravrgrate':'taxa d-1'})
-    taxas_med['taxa d-1'] = taxas_med['taxa d-1'].astype(float)
-    # taxas_med.to_excel(f"taxas_{dt.strftime('%Y-%m-%d')}.xlsx")
-    repac = repac.merge(taxas_med ,on=['codigo'],how='inner')
-    stock_prices = DB.get_prices(dt_1)
-    stock_prices.columns = ['codigo','preco d-1']
+    if os.path.exists(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx"):
+        devolucoes = pd.read_excel(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx")
 
-    repac = repac.merge(stock_prices,on=['codigo'],how='inner')
-    repac['taxa média']=repac['volume']/repac['dbl_quantidade']
-    repac['volume repac'] = repac['preco d-1']*repac['taxa d-1']*repac['dbl_quantidade']
-    repac['volume atual'] = repac['volume']*repac['preco']
+        repac = repac[~repac['str_numcontrato'].isin(devolucoes['Codigo'])]
+        repac.groupby(['str_fundo','codigo','tipo','taxa','preco','str_numcontrato','modalidade','vencimento','corretora']).agg({'volume':sum,'dbl_quantidade':sum}).reset_index()
+        taxas_med =DB.get_taxasalugueis(None)[['tckrsymb','takravrgrate']].rename(columns={'tckrsymb':'codigo','takravrgrate':'taxa d-1'})
+        taxas_med['taxa d-1'] = taxas_med['taxa d-1'].astype(float)
+        # taxas_med.to_excel(f"taxas_{dt.strftime('%Y-%m-%d')}.xlsx")
+        repac = repac.merge(taxas_med ,on=['codigo'],how='inner')
+        stock_prices = DB.get_prices(dt_1)
+        stock_prices.columns = ['codigo','preco d-1']
 
-    repac['vencimento'] = repac['vencimento'].apply(lambda x: datetime.datetime.strptime(str(x),'%Y%m%d').date())
-    internas_repac = repac[['str_numcontrato','tipo']].drop_duplicates().dropna()
+        repac = repac.merge(stock_prices,on=['codigo'],how='inner')
+        repac['taxa média']=repac['volume']/repac['dbl_quantidade']
+        repac['volume repac'] = repac['preco d-1']*repac['taxa d-1']*repac['dbl_quantidade']
+        repac['volume atual'] = repac['volume']*repac['preco']
 
-    contratos_internos = list()
-    for x in internas_repac['str_numcontrato'].unique():
-        if internas_repac['str_numcontrato'].tolist().count(x)>1:
-            contratos_internos.append(x)
+        repac['vencimento'] = repac['vencimento'].apply(lambda x: datetime.datetime.strptime(str(x),'%Y%m%d').date())
+        internas_repac = repac[['str_numcontrato','tipo']].drop_duplicates().dropna()
 
-    repac = repac[~repac['str_numcontrato'].isin(contratos_internos)]
+        contratos_internos = list()
+        for x in internas_repac['str_numcontrato'].unique():
+            if internas_repac['str_numcontrato'].tolist().count(x)>1:
+                contratos_internos.append(x)
 
-    repac = repac[repac['vencimento']>dt]
+        repac = repac[~repac['str_numcontrato'].isin(contratos_internos)]
 
-    repac = repac[['dte_data','str_fundo', 'str_mesa', 'str_estrategia', 'str_numcontrato','vencimento',
-        'dbl_quantidade', 'codigo', 'tipo', 'corretora','preco','preco d-1', 'taxa d-1', 'taxa média', 'volume repac', 'volume atual']]
+        repac = repac[repac['vencimento']>dt]
 
-    tomador_repac = repac[repac['tipo']=='T']
-    doador_repac = repac[repac['tipo']=='D']
+        repac = repac[['dte_data','str_fundo', 'str_mesa', 'str_estrategia', 'str_numcontrato','vencimento',
+            'dbl_quantidade', 'codigo', 'tipo', 'corretora','preco','preco d-1', 'taxa d-1', 'taxa média', 'volume repac', 'volume atual']]
 
-    tomador_repac = tomador_repac[tomador_repac['volume repac']<tomador_repac['volume atual']]
-    tomador_repac['dif'] = (tomador_repac['volume repac']/tomador_repac['volume atual'])*100
-    tomador_repac_new = tomador_repac[tomador_repac['dif']<70]
-    contratos_devol = tomador_repac_new['str_numcontrato'].unique()
+        tomador_repac = repac[repac['tipo']=='T']
+        doador_repac = repac[repac['tipo']=='D']
 
-    tomador_repac_new = tomador_repac_new.groupby(['str_fundo','codigo']).agg({'dbl_quantidade':sum}).reset_index()
+        tomador_repac = tomador_repac[tomador_repac['volume repac']<tomador_repac['volume atual']]
+        tomador_repac['dif'] = (tomador_repac['volume repac']/tomador_repac['volume atual'])*100
+        tomador_repac_new = tomador_repac[tomador_repac['dif']<70]
+        contratos_devol = tomador_repac_new['str_numcontrato'].unique()
+
+        tomador_repac_new = tomador_repac_new.groupby(['str_fundo','codigo']).agg({'dbl_quantidade':sum}).reset_index()
 
 
-    doador_repac['dif'] = (doador_repac['volume repac']/doador_repac['volume atual'])*100
-    doador_repac_new = doador_repac[doador_repac['dif']>200]
-
-    tomador_repac_new.to_excel("rG:\Trading\K11\Aluguel\Arquivos\Repactuação\\tomador_"+dt.strftime('%Y%m%d')+'.xlsx')
-    doador_repac_new.to_excel("rG:\Trading\K11\Aluguel\Arquivos\Repactuação\\doador_"+dt.strftime('%Y%m%d')+'.xlsx')
-
+        doador_repac['dif'] = (doador_repac['volume repac']/doador_repac['volume atual'])*100
+        doador_repac_new = doador_repac[doador_repac['dif']>200]
+        if not os.path.exists(r"G:\Trading\K11\Aluguel\Arquivos\Repactuação\\tomador_"+dt.strftime('%Y%m%d')+'.xlsx'):
+            tomador_repac_new['Devolver']=None
+            tomador_repac_new.to_excel(r"G:\Trading\K11\Aluguel\Arquivos\Repactuação\\tomador_"+dt.strftime('%Y%m%d')+'.xlsx')
+            # doador_repac_new.to_excel(r"G:\Trading\K11\Aluguel\Arquivos\Repactuação\\doador_"+dt.strftime('%Y%m%d')+'.xlsx')
+            tomador_repac.to_excel(r"G:\Trading\K11\Aluguel\Arquivos\Repactuação\\contratos_tomadores_devol_"+dt.strftime('%Y%m%d')+'.xlsx')
 
 
 
@@ -267,7 +273,8 @@ def main():
         renov['fixo'] = 0
 
         renov = renov[['data','str_fundo','corretora','tipo','vencimento','taxa','preco','reversivel','codigo','contrato','saldo','Quantidade','taxa d-1','Vencimento next','Troca','registro','e1','comissao','fixo']].drop_duplicates()
-        renov[renov['vencimento']==dt_next_3].to_excel(r'G:\Trading\K11\Aluguel\Arquivos\Renovações\renovacao_'+dt.strftime('%Y%m%d')+'.xlsx')
+        renov = renov[renov['vencimento']==dt_next_3]
+        renov.to_excel(r'G:\Trading\K11\Aluguel\Arquivos\Renovações\renovacao_'+dt.strftime('%Y%m%d')+'.xlsx')
 
         if 'BOVA11' not in renov['codigo']:
             df_devol = pd.DataFrame()
@@ -499,7 +506,7 @@ def main():
         return -2
     
     recalls =  get_bbi.req_mov_alugueis_solicitacao_liq(dt)
-    recalls.to_excel('recalls_complete.xlsx')
+    recalls.to_excel(f"G:\Trading\K11\Aluguel\Arquivos\Recalls\\recalls_complete_{dt.strftime('%Y-%m-%d')}.xlsx")
 
     ## warning btc recall
     try:

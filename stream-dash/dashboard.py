@@ -75,7 +75,14 @@ def pretty(s: str) -> str:
 	except KeyError:
 		return s.capitalize()
 
-
+aux_dict =  { "position":sum,
+		"to_lend Dia agg":sum,
+		'to_borrow_1':sum,
+		'custodia_0':sum,
+		'custodia_1':sum,
+		'custodia_2':sum,
+		'custodia_3':sum,
+		'devol_tomador_of':sum}
 table_subsidio = "G:\\Trading\\K11\\Aluguel\\Subsidiado\\aluguel_subsidiado.xlsx"
 devol = pd.DataFrame()
 aux_sub=pd.DataFrame(columns=['str_corretora','dbl_taxa','str_codigo','dbl_quantidade','dte_vencimento','dte_data'])
@@ -129,7 +136,8 @@ image_path = "logo-kapitalo.png"
 st.set_page_config(layout="wide")
 main_df=pd.DataFrame()
 
-
+if 'otm_devol' not in st.session_state:
+		st.session_state['otm_devol'] = pd.DataFrame()
 
 
 def img_to_bytes(img_path):
@@ -305,6 +313,40 @@ if options == "Taxa":
 	real.add_trace(go.Scatter(x=df['hour'].tolist(),y=df['rate'].tolist(),name='Taxa'),secondary_y=True)
 	st.plotly_chart(real, use_container_width=True)
 
+def build_devol_otm(df,dt_1=None,dt_liq=None):
+	if dt_1==None:
+		dt_1 = workdays.workday(datetime.date.today(), -1, holidays_b3)
+		dt_liq = workdays.workday(dt_1, 4, holidays_b3)
+	db_conn_test = psycopg2.connect(
+	host=config.DB_TESTE_HOST,
+	dbname=config.DB_TESTE_NAME,
+	user=config.DB_TESTE_USER,
+	password=config.DB_TESTE_PASS)
+	# lista_fundos = tuple(['KAPITALO KAPPA MASTER FIM','KAPITALO KAPPA PREV MASTER FIM','KAPITALO K10 PREV MASTER FIM'])
+
+	query = f"select dte_negociacao,str_num_contrato,str_corretora from tbl_custodia_alugueis_imbarq where dte_data='{dt_1.strftime('%Y-%m-%d')}' and dte_vencimento>='{dt_liq.strftime('%Y-%m-%d')}'"
+	ctos_ref = pd.read_sql(query, db_conn_test).drop_duplicates()
+	ctos_ref_dt = dict(zip(ctos_ref.str_num_contrato, ctos_ref.dte_negociacao))
+	ctos_ref_broker = dict(zip(ctos_ref.str_num_contrato, ctos_ref.str_corretora))
+	db_conn_test.close()
+	path = f"G:\Trading\K11\Aluguel\Arquivos\Repactuação\contratos_tomadores_devol_{datetime.date.today().strftime('%Y%m%d')}.xlsx"
+	ctos = pd.read_excel(path).rename(columns={'dbl_quantidade':'saldo'})
+
+	df = df.merge(ctos,on=['str_fundo','codigo'],how='inner')
+
+	df['dte_data'] = df['str_numcontrato'].map(ctos_ref_dt)
+	df['str_corretora'] = df['str_numcontrato'].map(ctos_ref_broker)
+	df['reversivel'] = 'TD'
+	df['dbl_quantidade'] = df['saldo']
+	df = df[['dte_data','str_fundo','str_corretora','tipo','vencimento','taxa média','preco','reversivel','codigo','str_numcontrato','saldo','dbl_quantidade']].dropna()
+	df.to_excel(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\devol_otimizacao_{dt.strftime('%Y-%m-%d')}.xlsx")
+
+	
+
+
+	return 0
+
+
 if options == "Rotina":
    
 	# if datetime.datetime.fromtimestamp(os.path.getmtime(f"G:\Trading\K11\Aluguel\Arquivos\Main\main_v2_{dt.strftime('%Y-%m-%d')}.xlsx")).date() == datetime.date.today():
@@ -321,7 +363,7 @@ if options == "Rotina":
 		main_df = mapa.main()
 		df_renovacao = DB.get_renovacoes()
 		# data.update_sub()
-		devol = fill_devol(main_df)
+		
 
 	st.title(f"Rotina - BTC - {dt.strftime('%Y-%m-%d')}")
 	st.write("Conjunto de arquivos uteis para a rotina")
@@ -358,6 +400,15 @@ if options == "Rotina":
 	
 	if Path(f"G:\Trading\K11\Aluguel\Arquivos\Main\main_v2_{dt.strftime('%Y-%m-%d')}.xlsx").exists():
 		st.success('Carteira Pronta!', icon="✅")
+		if st.button('Run Map Routine'):
+			result_m = mapa.main()
+			if not type(result_m )== pd.DataFrame:
+				if result_m == -1:
+					st.error("Descamento Imbarq com o Back. Aguarde um novo processamento e tente novamente depois ...", icon="🚨")  
+				elif  result_m == -2:
+					st.error("Boletas Internas Pendentes. Rode a rotina de internas ou aguarde refletirem no ibotz, caso não reflite, questione sobre o funcionamento da API", icon="🚨") 
+			else:
+				st.success('Taca o pau!', icon="✅")
 	else:
 		st.error('Carteira Pendente!', icon="🚨")
 		if st.button('Run Map Routine'):
@@ -369,6 +420,7 @@ if options == "Rotina":
 					st.error("Boletas Internas Pendentes. Rode a rotina de internas ou aguarde refletirem no ibotz, caso não reflite, questione sobre o funcionamento da API", icon="🚨") 
 			else:
 				st.success('Taca o pau!', icon="✅")
+		
 
 	st.write("## Tomar pra janela ")
 	borrow_janela = pd.read_excel("G:\Trading\K11\Aluguel\Arquivos\Tomar\Janela\\"
@@ -413,6 +465,7 @@ if options == "Rotina":
 	+ dt.strftime("%d-%m-%Y")
 	+ ".xlsx")
 	borrow_dia = borrow_dia.drop('Unnamed: 0',axis=1)
+	borrow_dia = borrow_dia.loc[(~(borrow_dia['fundo'].isin(['KAPITALO K10 PREV MASTER FIM','KAPITALO K10 MASTER FIM','KAPITALO K10 PREV II MASTER FIM']))&(borrow_dia['codigo']=='BRFS3'))]
 	if borrow_dia.empty:
 		st.write("Não há ativos para tomar para o dia")
 	else:
@@ -495,7 +548,7 @@ if options == "Rotina":
 
 
 
-	saldo_lend = pd.read_excel(r"G:\Trading\K11\Aluguel\Arquivos\Doar\Reservados\08-11-2023\Reservados_"
+	saldo_lend = pd.read_excel(f"G:\Trading\K11\Aluguel\Arquivos\Doar\Reservados\{dt.strftime('%d-%m-%Y')}\Reservados_"
 		+ dt.strftime("%Y-%m-%d")
 		+ ".xlsx")
 
@@ -555,14 +608,32 @@ if options == "Rotina":
 		st.write(f"Renovações inseridas automaticamente" )
 
 
+	st.write('## Devoluções')
 
-def color_column(val, med, type_col):
-	if type_col == 'T':
-		color = 'red' if val > med else 'none'
+	if not os.path.exists(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx"):
+		if st.button('Gerar devoluções'):
+			fill_devol(pd.read_excel(f"G:\Trading\K11\Aluguel\Arquivos\Main\main_v2_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx").groupby(["fundo","codigo"]).agg(aux_dict).reset_index())
+			st.write(f" Arquivo de devolução disponível: G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx ")
+
 	else:
-		color = 'red' if val < med else 'none'
-	return f'background-color: {color}'
+		st.write(f" Arquivo de devolução disponível: G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx ")
 
+	st.write("## Tomadoras otimização")
+	
+	if not os.path.exists(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\devol_otimizacao_{dt.strftime('%Y-%m-%d')}.xlsx"):
+		if os.path.exists(r"G:\Trading\K11\Aluguel\Arquivos\Repactuação\\contratos_tomadores_devol_"+dt.strftime('%Y%m%d')+'.xlsx'):
+			st.session_state['otm_tomador'] = pd.read_excel(f"G:\Trading\K11\Aluguel\Arquivos\Repactuação\\tomador_{dt.strftime('%Y%m%d')}.xlsx")[['str_fundo','codigo','dbl_quantidade','Devolver']]
+			if not st.session_state['otm_tomador'].empty:
+				st.session_state['otm_tomador'] = st.data_editor(st.session_state['otm_tomador'], use_container_width=True)
+
+				if st.button('Gerar Devoluções'):
+					
+					build_devol_otm( df = st.session_state['otm_tomador'].loc[st.session_state['otm_tomador']['Devolver'].notna()],dt_1=None,dt_liq=None)
+					del st.session_state['otm_tomador']
+		else:
+			st.write('Gerar devoluções para gerar as otimizações')
+	else:
+		st.write(f"Boleta de devolução : G:\Trading\K11\Aluguel\Arquivos\Devolução\devol_otimizacao_{dt.strftime('%Y-%m-%d')}.xlsx")
 
 
 def insert_new(df):
@@ -639,7 +710,7 @@ if options == "Boletador":
 			result = insert_new(df=st.session_state['aux_boleta'])
 			st.write(result)
 	if st.button('Clean Cache'):
-		st.session_state['aux_boleta'] = pd.DataFrame()
+		del st.session_state['aux_boleta']
 		
 
 

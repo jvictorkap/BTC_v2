@@ -46,9 +46,13 @@ def parse_excel_safra(file_path):
     df["str_status"] = "Emprestimo"
     df['str_tipo'] = df['str_tipo'].apply(lambda x: x[0])
     df['dbl_quantidade']=df.apply(lambda row: 1*abs(row['dbl_quantidade'])*side_bol[row['str_tipo']],axis=1)
+    
+    df["dte_databoleta"] = date.today().strftime("%Y-%m-%d")
+    df["dte_data"] = date.today().strftime("%Y-%m-%d")
 
-    return df[
-        [
+    return df[[
+            "dte_databoleta",
+            "dte_data",
             "str_fundo",
             "str_corretora",
             "str_tipo",
@@ -60,7 +64,6 @@ def parse_excel_safra(file_path):
             "str_tipo_comissao",
             "dbl_valor_fixo_comissao",
             "str_papel",
-            "dbl_quantidade",
+            "dbl_quantidade",                  
             "str_status",
-        ]
-    ]
+    ]]

@@ -781,27 +781,22 @@ def get_alugueis_devol(dt_1,dt_liq,fundo=None):
 	user=config.DB_TESTE_USER,
 	password=config.DB_TESTE_PASS)
 	# lista_fundos = tuple(['KAPITALO KAPPA MASTER FIM','KAPITALO KAPPA PREV MASTER FIM','KAPITALO K10 PREV MASTER FIM'])
-	db_conn_risk = psycopg2.connect(
-	host=config.DB_RISK_HOST,
-	dbname=config.DB_RISK_NAME,
-	user=config.DB_RISK_USER,
-	password=config.DB_RISK_PASS,
-	)
+
 	query = f"select dte_negociacao,str_fundo,str_corretora,str_lado,dte_vencimento,dbl_taxa,dbl_preco,str_reversivel,str_codigo,str_num_contrato,dbl_quantidade from tbl_custodia_alugueis_imbarq where dte_data='{dt_1.strftime('%Y-%m-%d')}' and dte_vencimento>='{dt_liq.strftime('%Y-%m-%d')}'"
+	ctos = pd.read_sql(query, db_conn_test)
+	
 
 	query2 = f"select * from tbl_alugueisconsolidados where dte_data='{dt_1.strftime('%Y-%m-%d')}'"
 
-	ctos = pd.read_sql(query, db_conn_test)
+	
 
 
 	df = pd.read_sql(query2, db_conn_test)
-	
-	db_conn_test.close()    
-	db_conn_risk.close()
 
-
-	db_conn_risk.close()
 	db_conn_test.close()
+	
+
+
 	
 	
 	price = pd.read_excel(f"G:\\Trading\\K11\\Aluguel\\Arquivos\\Imbarq\\imbarq_file_{datetime.date.today().strftime('%Y%m%d')}.xlsx")
@@ -829,9 +824,9 @@ def get_alugueis_devol(dt_1,dt_liq,fundo=None):
 	ctos['quantidade'] = ctos['saldo']
 	ctos['taxa'] = ctos['taxa']*100
 	
-	ctos = ctos[['data','str_fundo','corretora','tipo','vencimento','taxa','preco','reversivel','codigo','str_numcontrato','quantidade']]
+	ctos = ctos[['data','str_fundo','corretora','tipo','vencimento','taxa','preco','reversivel','codigo','str_numcontrato','quantidade']].drop_duplicates()
 
-	ctos.to_excel('G:\Trading\K11\Aluguel\Arquivos\Devolução\ctos_devol_all.xlsx')
+	ctos.to_excel(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\ctos_devol_all_{datetime.date.today().strftime('%Y%m%d')}.xlsx")
 	## Boleta aux - input ibotz
 
 
@@ -1325,32 +1320,32 @@ def build_loan_files(filter_broker,today,taxas):
 
 
 	geral = new_df[~new_df['codigo'].isin(taxas['codigo'])].copy()
-	restricted = new_df.merge(taxas,on=['codigo'],how='inner')
-
+	restricted = new_df[new_df['codigo'].isin(taxas['codigo'])].merge(taxas,on=['codigo'],how='left')
+	print(restricted)
 	# new_df['str_corretora'] = new_df['str_corretora'].apply(lambda x: x.replace('Link','Guide'))
 	for x in new_df['str_corretora'].unique():
-		output_file_path = f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\{today.strftime('%d-%m-%Y')}\\Kapitalo_K11_{x}_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx"
+		output_file_path = f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\{datetime.date.today().strftime('%d-%m-%Y')}\\Kapitalo_K11_{x}_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx"
 		aux_x = geral[geral['str_corretora']==x][['fundo','codigo','Doador']].copy()
 		aux_x = aux_x[aux_x['Doador']>100]
 		if os.path.exists(
-			f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\{today.strftime('%d-%m-%Y')}"
+			f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\{datetime.date.today().strftime('%d-%m-%Y')}"
 		):
 
 			aux_x.to_excel(output_file_path)
 		else:
-			os.mkdir(f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\{today.strftime('%d-%m-%Y')}")
+			os.mkdir(f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\{datetime.date.today().strftime('%d-%m-%Y')}")
 			aux_x.to_excel(output_file_path)
 	
 		# restricted[restricted['str_corretora']==x][['fundo','codigo','Doador']].to_excel(f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Saldo-Dia-brokers\\Kapitalo_K11__restricted{x}_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx")
 	output_file_path_r =  f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Reservados\\{today.strftime('%d-%m-%Y')}\\Reservados_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx"
 	if os.path.exists(
-			f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Reservados\\{today.strftime('%d-%m-%Y')}"
+			f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Reservados\\{datetime.date.today().strftime('%d-%m-%Y')}"
 		):
 
-		restricted.groupby(['fundo','codigo']).agg({'to_lend':sum,'taxa media':np.mean,'taxa max':np.mean})[['to_lend','taxa media','taxa max']].reset_index().to_excel(output_file_path_r)
+		restricted[['fundo','codigo','to_lend','taxa media','taxa max']].drop_duplicates().to_excel(output_file_path_r)
 	else:
-		os.mkdir(f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Reservados\\{today.strftime('%d-%m-%Y')}")
-		restricted.groupby(['fundo','codigo']).agg({'to_lend':sum,'taxa media':np.mean,'taxa max':np.mean})[['to_lend','taxa media','taxa max']].reset_index().to_excel(output_file_path_r)
+		os.mkdir(f"G:\Trading\K11\Aluguel\Arquivos\Doar\\Reservados\\{datetime.date.today().strftime('%d-%m-%Y')}")
+		restricted[['fundo','codigo','to_lend','taxa media','taxa max']].drop_duplicates().reset_index().to_excel(output_file_path_r)
 
 
 

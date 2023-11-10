@@ -46,7 +46,7 @@ def get_df_custodia(df):
 def fill_devol(main_df: pd.DataFrame):
     df = get_df_devol(main_df)
     devol = emprestimo.get_devolucao(side='Tomador')
-    recalls = pd.read_excel(r"C:\Users\joao.ramalho\Documents\GitHub\BTC\Aluguel\recalls_complete.xlsx")
+    recalls = pd.read_excel(f"G:\Trading\K11\Aluguel\Arquivos\Recalls\\recalls_complete_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx")
 
     devol = devol[~devol['contrato'].isin(recalls['contrato'])]
     devol = devol[devol['tipo']=='T']
@@ -58,7 +58,7 @@ def fill_devol(main_df: pd.DataFrame):
     
     custodia = get_df_custodia(main_df)
 
-    custodia = custodia.loc[(custodia['custodia_1']>0)&(custodia['custodia_2']>0)]
+    custodia = custodia.loc[(custodia['custodia_0']>0)&(custodia['custodia_1']>0)&(custodia['custodia_2']>0)&(custodia['custodia_3']>0)]
 
     devol["estimativa"] = devol["taxa"] * devol["preco"]
 
@@ -75,10 +75,9 @@ def fill_devol(main_df: pd.DataFrame):
     devol = devol.merge(ativos_devol, on=["fundo","codigo"], how="inner")
 
     
-
     devol["devol_tomador"] = devol.apply(lambda row: min(min(min(min(row["custodia_0"],row["devol_tomador_of"]),row['custodia_1']),row['custodia_2']),row['custodia_3']),axis=1)
     #
-
+    print(devol)
     
     devol["fim"] = 0
 
@@ -139,7 +138,9 @@ def fill_devol(main_df: pd.DataFrame):
         inplace=True,
     )
     devol = devol.drop_duplicates()
-    devol.to_excel("G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao.xlsx")
+    devol = devol[devol['Quantidade']>0]
+    devol = devol[devol['Papel']!='BRFS3']
+    devol.to_excel(f"G:\Trading\K11\Aluguel\Arquivos\Devolução\devolucao_{datetime.date.today().strftime('%Y-%m-%d')}.xlsx")
 
     return devol
 
