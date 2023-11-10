@@ -15,7 +15,8 @@ sys.path.append("../..")
 sys.path.append(r'G:\Dev\python_utils')
 sys.path.append(r'C:/Users/joao.ramalho/Repositorio-jv/tasks/')
 from kpy.boletas_alugueis import enviar_boletas_base_de_aluguel_interno_ibotz
-from utils.ibotz import boletador
+import ibotz_k11 as boletador
+
 # db_conn_test = psycopg2.connect(
 #     host=config.DB_TESTE_HOST,
 #     dbname=config.DB_TESTE_NAME,
