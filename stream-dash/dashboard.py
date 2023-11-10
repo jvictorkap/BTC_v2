@@ -1,6 +1,6 @@
 import sys
 sys.path.append("..")
-sys.path.append("../")
+sys.path.append("../..")
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode, JsCode
 from st_aggrid.shared import GridUpdateMode
 import streamlit as st
@@ -465,7 +465,9 @@ if options == "Rotina":
 	+ dt.strftime("%d-%m-%Y")
 	+ ".xlsx")
 	borrow_dia = borrow_dia.drop('Unnamed: 0',axis=1)
-	borrow_dia = borrow_dia.loc[(~(borrow_dia['fundo'].isin(['KAPITALO K10 PREV MASTER FIM','KAPITALO K10 MASTER FIM','KAPITALO K10 PREV II MASTER FIM']))&(borrow_dia['codigo']=='BRFS3'))]
+	
+	borrow_dia = borrow_dia.loc[~((borrow_dia['fundo'].isin(['KAPITALO K10 PREV MASTER FIM','KAPITALO K10 MASTER FIM','KAPITALO K10 PREV II MASTER FIM']))&(borrow_dia['codigo']=='BRFS3'))]
+	
 	if borrow_dia.empty:
 		st.write("Não há ativos para tomar para o dia")
 	else:
